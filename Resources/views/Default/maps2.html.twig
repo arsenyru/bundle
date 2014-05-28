@@ -1,0 +1,56 @@
+{% extends 'PraktikaTestBundle:Default:mybase.html.twig' %}
+{% block title %}Визуализация точек{% endblock %}
+
+{% block body %}
+<div class="panel panel-primary">
+  <div class="panel-heading">
+    <h3 class="panel-title">Визуализация</h3>
+  </div>
+  <div class="panel-body">
+	<form action="" method="post">
+	Выберите базовую точку для визуализации точек, связанных с ней<br>
+	<select name="point">
+	{% for point in pts %}
+	<option value="{{point.getid}}">{{point.getpoint.getbase.__toString}}</a></option>
+	{% endfor %}	
+	</select><br>
+	Выберите формат визуализации<br>
+	<select name="format">
+		<option value="1">D3JS</option>
+		<option value="2">PNG</option>
+		<option value="3">PDF</option>
+	</select><br>
+    <button type="submit" class="btn btn-primary btn-xs">Показать</button><br>
+	<!--<a href="#" onClick = "
+	var div = document.getElementById('param');
+	div.style.display = (div.style.display=='none')?'block':'none';
+	">Настройка дополнительных параметров</a><br>-->
+	<div id="param" style="display: none">
+	Ширина карты:<br>
+	<input type="text" name="width" value="300"><br>
+	Ширина легенды:<br>
+	<input type="text" name="widthLegend" value="200"><br>
+	Высота карты:<br>
+	<input type="text" name="height" value="300"><br>	
+	Цвет центральной точки:<br>
+	<input type="text" name="colorCenter" value="000000"><br>
+	Цвет легенды:<br>
+	<input type="text" name="colorLegend" value="000000"><br>	
+	Цвет фона:<br>
+	<input type="text" name="colorBG" value="FFFFFF"><br>
+	Цвет точек:<br>
+	<input type="text" name="colorPoint" value="000000"><br>
+	Размер точек:<br>
+	<input type="text" name="sizePoints" value="6"><br>
+	Размер шрифта:<br>
+	<input type="text" name="fontSize" value="10"><br>	
+	Надпись для meters:<br>
+	<input type="text" name="metersLabel" value="метров"><br>		
+	Надпись для center:<br>
+	<input type="text" name="metersLabel" value="Центр"><br>
+	</div>	
+	</form>
+  </div>
+  <a href="{{ path('praktika_test_homepage') }}">На главную страничку тестового приложения</a><br>
+</div>
+{% endblock %}

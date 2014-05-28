@@ -1,0 +1,784 @@
+<?php
+
+namespace Praktika\TestBundle\Controller;
+
+use Symfony\Bundle\FrameworkBundle\Controller\Controller;
+use Praktika\TestBundle\Entity\Points;
+use Praktika\TestBundle\Entity\APoints;
+use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpFoundation\Request;
+use Knp\DoctrineBehaviors\ORM\Geocodable\Type\Point;
+use Knp\DoctrineBehaviors\ORM\Geocodable\Type\APoint;
+use Praktika\TestBundle\Form\Extension\FormType;
+use Praktika\TestBundle\Form\Extension\FormAType;
+use TCPDF;
+
+class DefaultController extends Controller
+{
+	public function emptyString ($string) {
+		if ($string=="")
+			return true;
+		else
+			return false;
+	}
+
+    public function indexAction()
+    {
+        return $this->render('PraktikaTestBundle:Default:index.html.twig');
+    }
+	
+	public function editpoint1Action (Request $request) {
+		$messages = array(); 
+		$id = -1;
+		if (isset($_GET['id'])) {
+			$id = intval($_GET['id']);
+			$em = $this->getDoctrine()->getEntityManager();
+			$product = $em->getRepository('PraktikaTestBundle:Points')->find($id);
+			$data['latitude'] = $product->getPoint()->getLatitude();
+			$data['longitude'] = $product->getPoint()->getLongitude();
+			$data['height'] = $product->getPoint()->getHeight();
+			$data['title'] = $product->getTitle();
+		} else {
+			$message = array('status'=>1, 'text' => 'Ошибка передачи данных о точке');
+			$messages[] = $message;	
+		}
+		
+		$errorEdit = false; // all right
+		if ($request->getMethod() == 'POST') {
+			if ($this->emptyString($_POST['latitude']) || $this->emptyString($_POST['longitude']) || $this->emptyString($_POST['height']) || $this->emptyString($_POST['title'])) {
+				$errorAdd = true;
+				$message = array('status'=>1, 'text' => 'Заполнены не все поля');
+				$messages[] = $message;				
+			}
+			else {
+				$repository = $this->getDoctrine()->getRepository('PraktikaTestBundle:Points');
+				$pp = new Point();
+				$result = $pp->setFromLLH($_POST['latitude'], $_POST['longitude'], $_POST['height']);
+				if ($result == 0) {
+					// проверка наличия такой точки
+					$point = $repository->findOneBy(array('point' => $pp));
+					if ($point && $point->getId()!=$id) {
+						$message = array('status'=>1, 'text' => 'Географический объект с такими координатами уже есть в базе данных');
+						$messages[] = $message;		
+						$errorEdit = true;
+					}
+					else {
+						$updPoint = $repository->find($id);
+						$updPoint->setPoint($pp);
+						$updPoint->setTitle($_POST['title']);
+						$em->flush();
+						return $this->redirect($this->generateUrl('praktika_test_viewp1')."?update");
+					}				
+				}
+				else {
+					$errorEdit = true;
+					// собираем все полученные ошибки
+					if ($result & 1) {
+						$message = array('status'=>1, 'text' => 'Неправильный формат высоты: должно быть число');
+						$messages[] = $message;
+					}
+					if ($result & 1<<1) {
+						$message = array('status'=>1, 'text' => 'Неправильный формат долготы: должно быть число');
+						$messages[] = $message;
+					}
+					if ($result & 1<<2) {
+						$message = array('status'=>1, 'text' => 'Неправильный формат широты: должно быть число');
+						$messages[] = $message;
+					}	
+					if ($result & 1<<3) {
+						$message = array('status'=>1, 'text' => 'Неправильный формат долготы: число должно быть географической координатой');
+						$messages[] = $message;
+					}	
+					if ($result & 1<<4) {
+						$message = array('status'=>1, 'text' => 'Неправильный формат широты: число должно быть географической координатой');
+						$messages[] = $message;
+					}					
+				}
+			}
+		}
+	
+		// добавляем названия
+		$formArray = array ('label_longitude'=>'Долгота',
+							'label_latitude'=>'Широта',
+							'label_height'=>'Высота',
+							'label_title'=>'Название');
+		
+		// подготавливаем массив в форму
+		foreach (array ('longitude', 'latitude', 'height', 'title') as $v)
+			if (isset($_POST[$v]))
+				$formArray[$v]=$_POST[$v];
+			else if(isset($data[$v]))
+				$formArray[$v]=$data[$v];
+			
+		
+		$form = $this->CreateForm(new FormType(), $formArray);
+        return $this->render('PraktikaTestBundle:Default:editpoint1.html.twig', array ('form'=>$form->createView(), 'messages'=>$messages, 'id'=>$id));
+	}
+############################################## VIEW 1 #########################################	
+	    public function viewp1Action(Request $request)
+    {
+		// message to view
+		// status - 0 good, 1 bad
+		// text - text of message
+		// example
+		// $messages[0]['status'] = 0, $messages[0]['text'] = "Delete completed"
+		$messages = array(); 
+		if ($request->getMethod() =='GET') {
+			if (isset($_GET['del'])) {
+				$id = intval($_GET['del']);
+				$em = $this->getDoctrine()->getEntityManager();
+				$product = $em->getRepository('PraktikaTestBundle:Points')->find($id);
+				
+				if (!$product) {
+					$message = array('status'=>1, 'text' => 'Нет такой точки');
+					$messages[] = $message;
+				}
+				else {
+					$em->remove($product);
+					$em->flush();
+					$message = array('status'=>0, 'text' => 'Удаление успешно выполнено');
+					$messages[] = $message;
+				}
+			}
+			if (isset($_GET['update'])) {
+				$message = array('status'=>0, 'text' => 'Изменение успешно выполнено');
+				$messages[] = $message;				
+			}
+		}
+		$errorAdd = false; // all right
+		if ($request->getMethod() == 'POST') {
+			if ($this->emptyString($_POST['latitude']) || $this->emptyString($_POST['longitude']) || $this->emptyString($_POST['height']) || $this->emptyString($_POST['title'])) {
+				$errorAdd = true;
+				$message = array('status'=>1, 'text' => 'Заполнены не все поля');
+				$messages[] = $message;				
+			}
+			else {
+				$newp = new Points();
+				$newp->setTitle($_POST['title']);
+				$pp = new Point();
+				$result = $pp->setFromLLH($_POST['latitude'], $_POST['longitude'], $_POST['height']);
+				if ($result == 0) {
+					// проверка наличия такой точки
+					$repository = $this->getDoctrine()->getRepository('PraktikaTestBundle:Points');
+					$point = $repository->findOneBy(array('point' => $pp));
+					if ($point) {
+						$message = array('status'=>1, 'text' => 'Географический объект с такими координатами уже есть в базе данных');
+						$messages[] = $message;		
+						$errorAdd = true;
+					}
+					else {
+						$newp->setPoint($pp);
+						$em = $this->getDoctrine()->getEntityManager();
+						$em->persist($newp);
+						$em->flush();
+						$message = array('status'=>0, 'text' => 'Добавление успешно выполнено');
+						$messages[] = $message;	
+					}				
+				}
+				else {
+					$errorAdd = true;
+					// собираем все полученные ошибки
+					if ($result & 1) {
+						$message = array('status'=>1, 'text' => 'Неправильный формат высоты: должно быть число');
+						$messages[] = $message;
+					}
+					if ($result & 1<<1) {
+						$message = array('status'=>1, 'text' => 'Неправильный формат долготы: должно быть число');
+						$messages[] = $message;
+					}
+					if ($result & 1<<2) {
+						$message = array('status'=>1, 'text' => 'Неправильный формат широты: должно быть число');
+						$messages[] = $message;
+					}	
+					if ($result & 1<<3) {
+						$message = array('status'=>1, 'text' => 'Неправильный формат долготы: число должно быть географической координатой');
+						$messages[] = $message;
+					}	
+					if ($result & 1<<4) {
+						$message = array('status'=>1, 'text' => 'Неправильный формат широты: число должно быть географической координатой');
+						$messages[] = $message;
+					}					
+				}
+			}
+		}
+		
+		
+		$pts = $this->getDoctrine()->getRepository('PraktikaTestBundle:Points')->findAll();
+	
+		// добавляем названия
+		$formArray = array ('label_longitude'=>'Долгота',
+							'label_latitude'=>'Широта',
+							'label_height'=>'Высота',
+							'label_title'=>'Название');
+		
+		if ($errorAdd) {
+			// подготавливаем массив в форму
+			foreach (array ('longitude', 'latitude', 'height', 'title') as $v)
+				if (isset($_POST[$v]))
+					$formArray[$v]=$_POST[$v];
+		}
+			
+		
+		$form = $this->CreateForm(new FormType(), $formArray);
+        return $this->render('PraktikaTestBundle:Default:viewp1.html.twig', array ('points'=>$pts, 'form'=>$form->createView(), 'messages'=>$messages));
+    }
+############################################## EDIT 2 #########################################
+
+	public function editpoint2Action (Request $request) {
+		$messages = array(); 
+		$id = -1;
+		if (isset($_GET['id'])) {
+			$id = intval($_GET['id']);
+			$em = $this->getDoctrine()->getEntityManager();
+			$product = $em->getRepository('PraktikaTestBundle:APoints')->find($id);
+			$data['latitude'] = $product->getPoint()->getBase()->getLatitude();
+			$data['longitude'] = $product->getPoint()->getBase()->getLongitude();
+			$data['height'] = $product->getPoint()->getBase()->getHeight();
+			$data['azimuth'] = $product->getPoint()->getAzimuth();
+			$data['distance'] = $product->getPoint()->getDistance();
+			$data['title'] = $product->getTitle();
+		} else {
+			$message = array('status'=>1, 'text' => 'Ошибка передачи данных о точке');
+			$messages[] = $message;	
+		}
+		
+		$errorEdit = false; // all right
+		if ($request->getMethod() == 'POST') {
+			if ($this->emptyString($_POST['latitude']) || $this->emptyString($_POST['longitude']) || $this->emptyString($_POST['height']) || $this->emptyString($_POST['title'])
+			|| $this->emptyString($_POST['azimuth']) || $this->emptyString($_POST['distance'])) {
+				$errorEdit = true;
+				$message = array('status'=>1, 'text' => 'Заполнены не все поля');
+				$messages[] = $message;				
+			}
+			else {
+				$repository = $this->getDoctrine()->getRepository('PraktikaTestBundle:APoints');
+				$pp = new APoint();
+				$result = $pp->setFromLLHAD($_POST['latitude'], $_POST['longitude'], $_POST['height'], $_POST['azimuth'], $_POST['distance']);
+				if ($result == 0) {
+					// проверка наличия такой точки
+					$point = $repository->findOneBy(array('point' => $pp));
+					if ($point && $point->getId()!=$id) {
+						$message = array('status'=>1, 'text' => 'Географический объект с такими координатами уже есть в базе данных');
+						$messages[] = $message;		
+						$errorEdit = true;
+					}
+					else {
+						$updPoint = $repository->find($id);
+						$updPoint->setPoint($pp);
+						$updPoint->setTitle($_POST['title']);
+						$em->flush();
+						return $this->redirect($this->generateUrl('praktika_test_viewp2')."?update");
+					}				
+				}
+				else {
+					$errorEdit = true;
+					// собираем все полученные ошибки
+					if ($result & 1) {
+						$message = array('status'=>1, 'text' => 'Неправильный формат высоты: должно быть число');
+						$messages[] = $message;
+					}
+					if ($result & 1<<1) {
+						$message = array('status'=>1, 'text' => 'Неправильный формат долготы: должно быть число');
+						$messages[] = $message;
+					}
+					if ($result & 1<<2) {
+						$message = array('status'=>1, 'text' => 'Неправильный формат широты: должно быть число');
+						$messages[] = $message;
+					}	
+					if ($result & 1<<3) {
+						$message = array('status'=>1, 'text' => 'Неправильный формат долготы: число должно быть географической координатой');
+						$messages[] = $message;
+					}	
+					if ($result & 1<<4) {
+						$message = array('status'=>1, 'text' => 'Неправильный формат широты: число должно быть географической координатой');
+						$messages[] = $message;
+					}		
+					if ($result & 1<<5) {
+						$message = array('status'=>1, 'text' => 'Неправильный формат расстояния: должно быть число');
+						$messages[] = $message;
+					}		
+					if ($result & 1<<6) {
+						$message = array('status'=>1, 'text' => 'Неправильный формат азимута: должно быть число');
+						$messages[] = $message;
+					}	
+					if ($result & 1<<7) {
+						$message = array('status'=>1, 'text' => 'Неправильный формат азимута: должен быть угол в градусах от 0 до 360');
+						$messages[] = $message;
+					}						
+				}
+			}
+		}
+	
+		// добавляем названия
+		$formArray = array ('label_longitude'=>'Долгота',
+							'label_latitude'=>'Широта',
+							'label_height'=>'Высота',
+							'label_title'=>'Название',
+							'label_azimuth'=>'Азимут',
+							'label_distance'=>'Расстояние');
+		
+		// подготавливаем массив в форму
+		foreach (array ('longitude', 'latitude', 'height', 'azimuth', 'distance', 'title') as $v)
+			if (isset($_POST[$v]))
+				$formArray[$v]=$_POST[$v];
+			else if(isset($data[$v]))
+				$formArray[$v]=$data[$v];
+			
+		
+		$form = $this->CreateForm(new FormAType(), $formArray);
+        return $this->render('PraktikaTestBundle:Default:editpoint2.html.twig', array ('form'=>$form->createView(), 'messages'=>$messages, 'id'=>$id));
+	}
+	
+############################################## VIEW 2 #########################################
+	    public function viewp2Action(Request $request)
+    {
+		$messages = array();
+		
+		if ($request->getMethod() =='GET') {
+			if (isset($_GET['del'])) {
+				$id = intval($_GET['del']);
+				$em = $this->getDoctrine()->getEntityManager();
+				$product = $em->getRepository('PraktikaTestBundle:APoints')->find($id);
+				
+				if (!$product) {
+					$message = array('status'=>1, 'text' => 'Нет такой точки');
+					$messages[] = $message;
+				}
+				else {
+					$em->remove($product);
+					$em->flush();
+					$message = array('status'=>0, 'text' => 'Удаление успешно выполнено');
+					$messages[] = $message;
+				}
+			}
+			if (isset($_GET['update'])) {
+				$message = array('status'=>0, 'text' => 'Изменение успешно выполнено');
+				$messages[] = $message;				
+			}
+		}
+		$errorAdd = false; // all right
+		
+		if ($request->getMethod() == 'POST') {
+			if ($this->emptyString($_POST['latitude']) || $this->emptyString($_POST['longitude']) || $this->emptyString($_POST['height']) || $this->emptyString($_POST['title']) 
+			|| $this->emptyString($_POST['azimuth']) || $this->emptyString($_POST['distance'])) {
+				$errorAdd = true;
+				$message = array('status'=>1, 'text' => 'Заполнены не все поля');
+				$messages[] = $message;				
+			}
+			else {
+				$newp = new APoints();
+				$newp->setTitle($_POST['title']);
+				$pp = new APoint();
+				$result = $pp->setFromLLHAD($_POST['latitude'], $_POST['longitude'], $_POST['height'], $_POST['azimuth'], $_POST['distance']);
+				if ($result==0) {
+					// проверка наличия такой точки
+					$repository = $this->getDoctrine()->getRepository('PraktikaTestBundle:APoints');
+					$point = $repository->findOneBy(array('point' => $pp));
+					if ($point) {
+						$message = array('status'=>1, 'text' => 'Географический объект с такими координатами уже есть в базе данных');
+						$messages[] = $message;		
+						$errorAdd = true;
+					}
+					else {
+						$newp->setPoint($pp);
+						$em = $this->getDoctrine()->getEntityManager();
+						$em->persist($newp);
+						$em->flush();
+						$message = array('status'=>0, 'text' => 'Добавление успешно выполнено');
+						$messages[] = $message;	
+					}
+				}
+				else {
+					$errorAdd = true;
+					// собираем все полученные ошибки
+					if ($result & 1) {
+						$message = array('status'=>1, 'text' => 'Неправильный формат высоты: должно быть число');
+						$messages[] = $message;
+					}
+					if ($result & 1<<1) {
+						$message = array('status'=>1, 'text' => 'Неправильный формат долготы: должно быть число');
+						$messages[] = $message;
+					}
+					if ($result & 1<<2) {
+						$message = array('status'=>1, 'text' => 'Неправильный формат широты: должно быть число');
+						$messages[] = $message;
+					}	
+					if ($result & 1<<3) {
+						$message = array('status'=>1, 'text' => 'Неправильный формат долготы: число должно быть географической координатой');
+						$messages[] = $message;
+					}	
+					if ($result & 1<<4) {
+						$message = array('status'=>1, 'text' => 'Неправильный формат широты: число должно быть географической координатой');
+						$messages[] = $message;
+					}			
+					if ($result & 1<<5) {
+						$message = array('status'=>1, 'text' => 'Неправильный формат расстояния: должно быть число');
+						$messages[] = $message;
+					}		
+					if ($result & 1<<6) {
+						$message = array('status'=>1, 'text' => 'Неправильный формат азимута: должно быть число');
+						$messages[] = $message;
+					}	
+					if ($result & 1<<7) {
+						$message = array('status'=>1, 'text' => 'Неправильный формат азимута: должен быть угол в градусах от 0 до 360');
+						$messages[] = $message;
+					}					
+				}
+			}
+		}	
+		$pts = $this->getDoctrine()->getRepository('PraktikaTestBundle:APoints')->findAll();
+		
+		// добавляем названия
+		$formArray = array ('label_longitude'=>'Долгота',
+							'label_latitude'=>'Широта',
+							'label_height'=>'Высота',
+							'label_title'=>'Название',
+							'label_azimuth'=>'Азимут',
+							'label_distance'=>'Расстояние');
+		
+		if ($errorAdd) {
+			// подготавливаем массив в форму
+			foreach (array ('longitude', 'latitude', 'height', 'title', 'distance', 'azimuth') as $v)
+				if (isset($_POST[$v]))
+					$formArray[$v]=$_POST[$v];
+		}
+			
+		
+		$form = $this->CreateForm(new FormAType(), $formArray);
+		
+        return $this->render('PraktikaTestBundle:Default:viewp2.html.twig', array ('form'=>$form->createView(), 'points'=>$pts, 'messages'=>$messages));
+    }
+	
+	
+################################### CALC DISTANCE ###################	
+	    public function distAction(Request $request)
+    {
+		$dist = null;
+		if ($request->getMethod() == 'POST') {
+			$pt1 = $_POST['point1'];
+			$pt2 = $_POST['point2'];
+			$pnt1 = new Point();
+			$pnt2 = new Point();
+			if ($pt1[0] == 'a') {
+				preg_match('#a([0-9]{1,})#im', $pt1, $arr);
+				$tmp = $this->getDoctrine()->getRepository('PraktikaTestBundle:APoints')->find($arr[1]);
+				$pnt1->setFromAPoint($tmp->getPoint());
+			}
+			else {
+				$tmp = $this->getDoctrine()->getRepository('PraktikaTestBundle:Points')->find($pt1);
+				$pnt1=$tmp->getPoint();
+			}
+			if ($pt2[0] == 'a') {
+				preg_match('#a([0-9]{1,})#im', $pt2, $arr);
+				$tmp = $this->getDoctrine()->getRepository('PraktikaTestBundle:APoints')->find($arr[1]);
+				$pnt2->setFromAPoint($tmp->getPoint());
+			}
+			else {
+				$tmp = $this->getDoctrine()->getRepository('PraktikaTestBundle:Points')->find($pt2);
+				$pnt2=$tmp->getPoint();
+			}		
+
+			$dist = $pnt1->getDistanceToPoint($pnt2);
+		}
+		
+		$pts = $this->getDoctrine()->getRepository('PraktikaTestBundle:Points')->findAll();
+		$apts = $this->getDoctrine()->getRepository('PraktikaTestBundle:APoints')->findAll();
+        return $this->render('PraktikaTestBundle:Default:dist.html.twig', array ('dist'=>$dist, 'pts'=>$pts, 'apts'=>$apts));
+    }	
+
+################################### GOOGLE MAPS ###################		
+	    public function googlemapsAction(Request $request)
+    {
+		$addClick = false;
+		if (isset($_GET['addclick'])) {
+			$addClick = true;
+			
+			if (isset($_POST['title'])) {
+				$lat = $_POST['lat'];
+				$long = $_POST['long'];
+				$height = 0;
+				$title = $_POST['title'];
+				$newp = new Points();
+				$newp->setTitle($title);
+				$pp = new Point();
+				$result = $pp->setFromLLH($lat, $long, $height);
+				$repository = $this->getDoctrine()->getRepository('PraktikaTestBundle:Points');
+				$newp->setPoint($pp);
+				$em = $this->getDoctrine()->getEntityManager();
+				$em->persist($newp);
+				$em->flush();
+				echo "Добавление точки <b>$title</b> успешно выполнено";
+				exit;
+			}
+		}
+		$pts = $this->getDoctrine()->getRepository('PraktikaTestBundle:Points')->findAll();
+		return $this->render('PraktikaTestBundle:Default:googlemaps.html.twig', array ('pts'=>$pts, 'addClick'=>$addClick));
+	}
+	
+################################### ЯНДЕКС КАРТЫ ###################		
+	    public function yamapsAction(Request $request)
+    {
+		$addClick = false;
+		if (isset($_GET['addclick'])) {
+			$addClick = true;
+			
+			if (isset($_POST['title'])) {
+				$lat = $_POST['lat'];
+				$long = $_POST['long'];
+				$height = 0;
+				$title = $_POST['title'];
+				$newp = new Points();
+				$newp->setTitle($title);
+				$pp = new Point();
+				$result = $pp->setFromLLH($lat, $long, $height);
+				$repository = $this->getDoctrine()->getRepository('PraktikaTestBundle:Points');
+				$newp->setPoint($pp);
+				$em = $this->getDoctrine()->getEntityManager();
+				$em->persist($newp);
+				$em->flush();
+				echo "Добавление точки <b>$title</b> успешно выполнено";
+				exit;
+			}
+			
+		}
+	
+		$pts = $this->getDoctrine()->getRepository('PraktikaTestBundle:Points')->findAll();
+		return $this->render('PraktikaTestBundle:Default:yamaps.html.twig', array ('pts'=>$pts, 'addClick'=>$addClick));
+	}
+	
+	public function maps2Action (Request $request) {
+		if ($request->getMethod()=='POST') {
+			$repo = $this->getDoctrine()->getRepository('PraktikaTestBundle:APoints');
+			// получили точку для отрисовки
+			$point = intval($_POST['point']);
+			// проверить, что есть
+			$dataPoint = $repo->find($point);
+			if (!$dataPoint);// error
+			else {			
+				// search maxDist
+				$pointsBased = array();
+				$allPoints = $repo->findAll();
+				foreach ($allPoints as $v) {
+					if ($v->getPoint()->getBase() == $dataPoint->getPoint()->getBase())
+						$pointsBased[] = $v;
+				}	
+				$maxDist = 0;
+				foreach ($pointsBased as $v) {
+					if ($v->getPoint()->getDistance()>$maxDist)
+						$maxDist = $v->getPoint()->getDistance();
+				}
+				
+				// параметры
+				$param['width'] = $width = 600; // ширина картинки
+				$param['widthLegend'] = $widthLegend = 200; // щирина легенды
+				$param['height'] = $height = 400; // высота картинки
+				$param['colorCenter'] = $colorCenter = 0x000000; // цвет отрисовки центральной точки
+				$param['colorLegend'] = $colorLegend = 0x000000; // цвет отрисовки легенды
+				$param['colorPoint'] = $colorPoints = 0x000000; // цвет отрисовки точек
+				$param['colorBG'] = $colorBG = 0xFFFFFF; // цвет фона
+				$param['sizePoints'] = $sizePoints = 6; // размер рисуемых точек
+				$param['font'] = $font = "arial.ttf"; // Шрифт ДОЛЖЕН быть в папке Resources/public/fonts/
+				$param['fontSize'] = $fontSize = 10; // размер шрифта	
+				$param['metersLabel'] = $metersLabel = "метров"; // свой перевод для meters
+				$param['points'] = $pointsBased; // массив точек для отрисовки
+				
+				if ($_POST['format']==3) { // pdf
+					$width = 300;
+					$widthLegend = 200; 
+					$height = 300;
+					$fontSize = 8; 
+				}
+				
+				$minWidthHeight = ($width>$height)?$height:$width;
+				$metersIn10Pix = $maxDist * 18 / $minWidthHeight;
+				
+				$pathToFont = __DIR__."/../Resources/public/fonts/".$font; // путь к используемому шрифту
+				if ($maxDist!=0)
+					$k = $minWidthHeight*0.9/(2*$maxDist);
+				else
+					$k=0;
+				
+					
+				$centerWidth = $width/2;
+				$centerHeight = $height/2;
+				
+				if ($_POST['format']==2 || $_POST['format']==3) {
+					// создаем картинку
+					$image = imageCreate($width+$widthLegend, $height);
+					$backColor = imageColorAllocate($image, ($colorBG>>16), ($colorBG>>8)%256, $colorBG%256);
+					$centerColor = imageColorAllocate($image, ($colorCenter>>16), ($colorCenter>>8)%256, $colorCenter%256);
+					$pointsColor = imageColorAllocate($image, ($colorPoints>>16), ($colorPoints>>8)%256, $colorPoints%256);
+					$legendColor = imageColorAllocate($image, ($colorLegend>>16), ($colorLegend>>8)%256, $colorLegend%256);
+					
+					// background
+					imageFilledRectangle($image, 0,0, $width, $height, $backColor);
+					imageRectangle($image, $width, 0, $widthLegend+$width-1, $height-1, $legendColor);
+					// добавляем масштаб в легенду
+					imageLine($image, $width+10, $height-$fontSize*2-1, $width+10, $height-$fontSize*2+1, $legendColor);
+					imageLine($image, $width+10, $height-$fontSize*2, $width+20, $height-$fontSize*2, $legendColor);
+					imageLine($image, $width+20, $height-$fontSize*2-1, $width+20, $height-$fontSize*2+1, $legendColor);
+					imageTTFText($image, $fontSize, 0, $width+$fontSize+20, $height-$fontSize*1.5, $legendColor, $pathToFont, "$metersIn10Pix $metersLabel");
+					
+					// center
+					imageFilledEllipse($image, $centerWidth, $centerHeight, $sizePoints, $sizePoints, $centerColor);
+					imageTTFText($image, $fontSize, 0, $centerWidth, $centerHeight+$fontSize+$sizePoints, $centerColor, $pathToFont, "0");
+					imageTTFText($image, $fontSize, 0, $width+$fontSize, $fontSize*2, $legendColor, $pathToFont, "0 - Центр");
+					// points
+					$i=1;
+					foreach ($pointsBased as $v) {
+						$angle = $v->getPoint()->getAzimuth() - 90 ; // угол для тригонометрии
+						 $pointWidth = $centerWidth+$k*($v->getPoint()->getDistance()*cos(deg2rad($angle)));
+						 $pointHeight = $centerHeight+$k*($v->getPoint()->getDistance()*sin(deg2rad($angle)));
+						 // рисуем точку
+						 imageEllipse ($image, $pointWidth, $pointHeight, $sizePoints, $sizePoints, $pointsColor);
+						 // подпись
+						 imageTTFText($image, $fontSize, 0, $pointWidth, $pointHeight+$fontSize+$sizePoints, $pointsColor, $pathToFont, $i);
+						 // в легенду
+						 imageTTFText($image, $fontSize, 0, $width+$fontSize, $fontSize*2*($i+1), $legendColor, $pathToFont, "$i - ".$v->getTitle());
+						 $i++;
+						}
+					if ($_POST['format']==2) {
+						//*
+						header("Content-type: image/png");
+						imagePng($image);
+						exit; 
+						//*/
+					}
+					else {
+						$pdf = new TCPDF('P', 'mm', 'A4', true, 'UTF-8', false);
+						$pdf->setPrintHeader(false); 
+						$pdf->setPrintFooter(false); 
+						$pdf->AddPage(); // создаем первую страницу, на которой будет содержимое 
+						ob_start();
+						imagePng($image);
+						$str = ob_get_clean();
+						$pdf->Image('@'.$str);
+						$pdf->Output('doc.pdf', 'I'); 
+						exit;
+					}
+				}
+				// иначе создадим скрипт D3JS
+				$param['div'] = $div = "chart"; // div id для вывода графика
+				
+				$script = 'var svg = d3.select("#'.$div.'").append("svg")
+		.attr("width", '.($width+$widthLegend).')
+		.attr("height", '.$height.');'; // создаем график
+		
+		$script.='	  
+		
+		svg.append("svg:line")
+			.attr("x1", '.($width+10).')
+			.attr("x2", '.($width+10).')
+			.attr("y1", '.($height-$fontSize*2-5).')
+			.attr("y2", '.($height-$fontSize*2+5).')
+			.style("stroke", d3.rgb('.$colorLegend.'))
+			.style("stroke-width", "1px");
+		
+		svg.append("svg:line")
+			.attr("x1", '.($width+20).')
+			.attr("x2", '.($width+20).')
+			.attr("y1", '.($height-$fontSize*2-5).')
+			.attr("y2", '.($height-$fontSize*2+5).')
+			.style("stroke", d3.rgb('.$colorLegend.'))
+			.style("stroke-width", "1px");
+
+		svg.append("svg:line")
+			.attr("x1", '.($width+10).')
+			.attr("x2", '.($width+20).')
+			.attr("y1", '.($height-$fontSize*2).')
+			.attr("y2", '.($height-$fontSize*2).')
+			.style("stroke", d3.rgb('.$colorLegend.'))
+			.style("stroke-width", "1px");			
+		  
+		   svg.append("text")
+			  .attr("x", '.($width+$fontSize+20).')
+			  .attr("y", '.($height-$fontSize*1.5).')
+			  .attr("dy", ".15em")
+			  .style("font-size", "'.$fontSize.'px")
+			  .style("text-anchor", "start")
+			  .style("color", d3.rgb('.$colorLegend.'))
+			  .text("'.$metersIn10Pix.' '.$metersLabel.'");
+		  
+		svg.append("circle")
+		  .attr("class", "dot")
+		  .attr("r", '.($sizePoints/2).')
+		  .attr("cx", '.$centerWidth.')
+		  .attr("cy", '.$centerHeight.')
+		  .style("stroke", d3.rgb('.$colorCenter.'));	
+
+		  svg.append("text")
+			  .attr("x", '.($centerWidth).')
+			  .attr("y", '.($centerHeight+$fontSize+$sizePoints).')
+			  .attr("dy", ".15em")
+			  .style("font-size", "'.$fontSize.'px")
+			  .style("text-anchor", "start")
+			  .style("color", d3.rgb('.$colorCenter.'))
+			  .text("0");	
+
+		  svg.append("text")
+			  .attr("x", '.($width+$fontSize).')
+			  .attr("y", '.($fontSize*2).')
+			  .attr("dy", ".15em")
+			  .style("font-size", "'.$fontSize.'px")
+			  .style("text-anchor", "start")
+			  .style("color", d3.rgb('.$colorLegend.'))
+			  .text("0 - Центр");		  
+		  ';
+		  
+		$i=1;
+		foreach ($pointsBased as $v) {
+			$angle = $v->getPoint()->getAzimuth() - 90 ; // угол для тригонометрии
+			 $pointWidth = $centerWidth+$k*($v->getPoint()->getDistance()*cos(deg2rad($angle)));
+			 $pointHeight = $centerHeight+$k*($v->getPoint()->getDistance()*sin(deg2rad($angle)));
+			 // рисуем точку
+			 $script.='svg.append("circle")
+				  .attr("class", "dot")
+				  .attr("r", '.($sizePoints/2).')
+				  .attr("cx", '.$pointWidth.')
+				  .attr("cy", '.$pointHeight.')
+				  .style("stroke", d3.rgb('.$colorPoints.'));	
+		  ';
+			 // подпись
+		  $script.='svg.append("text")
+				  .attr("x", '.($pointWidth).')
+				  .attr("y", '.($pointHeight+$fontSize+$sizePoints).')
+				  .attr("dy", ".15em")
+				  .style("font-size", "'.$fontSize.'px")
+				  .style("text-anchor", "start")
+				  .style("color", d3.rgb('.$colorPoints.'))
+				  .text("'.$i.'");
+		  ';	
+			 // в легенду
+		  $script.='svg.append("text")
+				  .attr("x", '.($width+$fontSize).')
+				  .attr("y", '.($fontSize*2*($i+1)).')
+				  .attr("dy", ".15em")
+				  .style("font-size", "'.$fontSize.'px")
+				  .style("text-anchor", "start")
+				  .style("color", d3.rgb('.$colorPoints.'))
+				  .text("'.("$i - ".$v->getTitle()).'");		  
+		  ';
+			 $i++;
+			}
+			// NOTE: use with filter raw to correct print javascript: {{script|raw}} 
+				return $this->render('PraktikaTestBundle:Default:maps2d3js.html.twig', array('script'=>$script));
+				
+			}
+		}
+		
+		$pts = $this->getDoctrine()->getRepository('PraktikaTestBundle:APoints')->findAll();
+		$points = array();
+		for ($i=0;$i<count($pts);$i++) {
+			$base = $pts[$i]->getPoint()->getBase()->__toString();
+			$flag = false;
+			for ($j=0;$j<$i;$j++)
+				if ($pts[$j]->getPoint()->getBase()->__toString()==$base) {
+					$flag = true;
+					break;
+				}
+			if (!$flag)
+				$points[]=$pts[$i];
+		}
+		return $this->render('PraktikaTestBundle:Default:maps2.html.twig', array ('pts'=>$points));		
+	}
+}

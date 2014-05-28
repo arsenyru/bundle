@@ -1,0 +1,44 @@
+{% extends 'PraktikaTestBundle:Default:mybase.html.twig' %}
+{% block title %}Вычисление расстояний между точками{% endblock %}
+
+{% block body %}
+<div class="panel panel-primary">
+  <div class="panel-heading">
+    <h3 class="panel-title">Вычисление расстояний</h3>
+  </div>
+  <div class="panel-body">
+{% if not dist is empty%}
+<h4 class="text-success">Расстояние {{dist|number_format(2, '.', ' ')}} метров!</h4>
+{% endif %}
+<div class="panel panel-default">
+		<div class="panel-heading">Вычислить расстояние между точками:
+	</div>
+    <div class="panel-body">
+<form action="{{ path('praktika_test_dist') }}" method="post">
+	Точка 1 <select name="point1">
+	<option disabled> Точки первого формата </option>
+	{% for point in pts %}
+	<option value="{{point.getid}}">{{point.gettitle}} - {{point.getpoint.__toString}}</a></option>
+	{% endfor %}
+	<option disabled> Точки второго формата </option>
+	{% for point in apts %}
+	<option value="a{{point.getid}}">{{point.gettitle}} - {{point.getpoint.__toString}}</a></option>
+	{% endfor %}	
+	</select><br>
+    Точка 2
+	<select name="point2">
+	<option disabled> Точки первого формата </option>
+	{% for point in pts %}
+	<option value="{{point.getid}}">{{point.gettitle}} - {{point.getpoint.__toString}}</a></option>
+	{% endfor %}
+	<option disabled> Точки второго формата </option>
+	{% for point in apts %}
+	<option value="a{{point.getid}}">{{point.gettitle}} - {{point.getpoint.__toString}}</a></option>
+	{% endfor %}
+	</select><br>
+	<input type="submit" value="Посчитать" />
+</form>
+</div></div>
+<a href="{{ path('praktika_test_homepage') }}">На главную страничку тестового приложения</a><br>
+</div>
+{% endblock %}

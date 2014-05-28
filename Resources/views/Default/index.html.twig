@@ -1,0 +1,17 @@
+{% extends 'PraktikaTestBundle:Default:mybase.html.twig' %}
+{% block title %}Тестовое приложение!{% endblock %}
+
+{% block body %}
+<div class="panel panel-primary">
+  <div class="panel-heading">
+    <h3 class="panel-title">Тестовое приложение</h3>
+  </div>
+  <div class="panel-body">
+	<a href="{{ path('praktika_test_viewp1') }}">Список точек 1</a> в формате широта-долгота-высота<br>
+	<a href="{{ path('praktika_test_viewp2') }}">Список точек 2</a> в формате базовая точка-азимут-расстояние<br>
+	<a href="{{ path('praktika_test_dist') }}">Вычисление расстояний</a> между точками<br>
+	Отображение точек 1 на картах <a href="{{ path('praktika_test_googlemaps') }}">Google Maps</a> | <a href="{{ path('praktika_test_yamaps') }}">Яндекс.Карты</a><br>
+	<a href="{{ path('praktika_test_maps2') }}">Отображение точек 2</a> на страничке / картинке / PDF<br>
+  </div>
+</div>
+{% endblock %}

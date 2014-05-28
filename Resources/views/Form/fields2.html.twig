@@ -1,0 +1,17 @@
+{% extends 'form_div_layout.html.twig' %}
+{% block geoapoint2_widget %}
+    {% spaceless %}
+	{{form.geo.vars.label_latitude}}<br>
+	<input type="text" name="latitude" value="{% if form.geo.vars.latitude %}{{form.geo.vars.latitude}}{%endif%}"><br>
+	{{form.geo.vars.label_longitude}}<br>
+	<input type="text" name="longitude" value="{% if form.geo.vars.longitude %}{{form.geo.vars.longitude}}{%endif%}"><br>
+	{{form.geo.vars.label_height}}<br>
+	<input type="text" name="height" value="{% if form.geo.vars.height %}{{form.geo.vars.height}}{%endif%}"><br>
+	{{form.geo.vars.label_azimuth}}<br>
+	<input type="text" name="azimuth" value="{% if form.geo.vars.azimuth %}{{form.geo.vars.azimuth}}{%endif%}"><br>
+	{{form.geo.vars.label_distance}}<br>
+	<input type="text" name="distance" value="{% if form.geo.vars.distance %}{{form.geo.vars.distance}}{%endif%}"><br>	
+	{{form.geo.vars.label_title}}<br>
+	<input type="text" name="title" value="{% if form.geo.vars.title %}{{form.geo.vars.title}}{%endif%}"><br>
+    {% endspaceless %}
+{% endblock geoapoint2_widget %}

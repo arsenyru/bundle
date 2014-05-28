@@ -1,0 +1,90 @@
+{% extends 'PraktikaTestBundle:Default:mybase.html.twig' %}
+{% block title %}Отображение точек на карте{% endblock %}
+{% block onload %} onload="initialize()"{%endblock%}
+{%block myscript%}
+    <meta name="viewport" content="initial-scale=1.0, user-scalable=no" />
+    <style type="text/css">
+      html { height: 100% }
+      body { height: 100%; margin: 0; padding: 0 }
+      #map_canvas { height: 50% }
+    </style>
+<script type="text/javascript"
+  src="http://maps.googleapis.com/maps/api/js?key=AIzaSyDQHv7bOsO3ic5deOBx8Cz-WR6jLo3NxYo&sensor=false">
+</script>
+<script type="text/javascript" src="http://maps.googleapis.com/maps/api/js?libraries=places&sensor=false"></script>
+<script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.3/jquery.min.js"></script>
+<script type="text/javascript">
+var markers = new Array();
+var map;
+function initialize() {
+		var mapOptions = {
+		  center: new google.maps.LatLng({{pts[0].getpoint.getlatitude}}, {{pts[0].getpoint.getlongitude}}),
+		  zoom: 10,
+		  mapTypeId: google.maps.MapTypeId.ROADMAP
+		};
+		map = new google.maps.Map(document.getElementById("map_canvas"),
+			mapOptions);
+		{% for point in pts %}
+			var myLatlng = new google.maps.LatLng({{point.getpoint.getlatitude}},{{point.getpoint.getlongitude}});
+			markers[{{loop.index}}] = new google.maps.Marker({
+			  position: myLatlng,
+			  map: map,
+			  title:"{{point.gettitle}}"
+		  });
+		{% endfor %}
+		
+		{% if addClick %}
+		geocoder = new google.maps.Geocoder();
+		google.maps.event.addListener(map, 'click', function(e) {
+			var titleToBD = 'Google Maps Point '+parseInt(Math.random()*1000);
+			geocoder.geocode({'latLng': e.latLng}, function(results, status) {
+			if (status == google.maps.GeocoderStatus.OK) {
+				if (results[1]) {
+					titleToBD = results[1].formatted_address;
+				}
+			}
+			else
+				titleToBD = 'Geocoder failed due to: ' + status;
+			
+			$.ajax({ // AJAX to Add
+				type:'post',
+				url:'{{ path('praktika_test_googlemaps') }}?addclick',
+				data: {'lat': e.latLng.lat(), 'long': e.latLng.lng(), 'title': titleToBD},
+				response: 'text',
+				success:function (data) {
+					$('#response').html(data);
+				}
+			});
+			});
+		  });
+		{%endif%}
+}
+</script>
+{%endblock%}
+{% block body %}
+<div class="navbar navbar-inverse">
+  <div class="navbar-header">
+    <a class="navbar-brand" href="#">Отображение точек на карте</a>
+  </div>
+  <div class="navbar-collapse collapse navbar-inverse-collapse">
+    <ul class="nav navbar-nav">
+      <li class="active"><a href="#">Google Maps</a></li>
+      <li><a href="{{ path('praktika_test_yamaps') }}">Яндекс.Карты</a></li>
+    </ul>
+	</div>
+</div>
+{% if (addClick) %}
+По клику на карте в базу данных первого формата будет добавлена точка<br>
+<span class="label label-success" id="response"></span>
+{% endif %}
+<div id="map_canvas"></div>
+<div class="panel panel-default">
+  <div class="panel-heading">Точки на карте</div>
+  <div class="panel-body">
+    {% for point in pts %}
+	<a href="#" onClick="map.setCenter(markers[{{loop.index}}].getPosition())">{{point.gettitle}}</a>
+	{% endfor %}
+  </div>
+</div>
+<a href="{{ path('praktika_test_homepage') }}">На главную страничку тестового приложения</a><br>
+{% endblock %}

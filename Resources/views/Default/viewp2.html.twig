@@ -1,0 +1,67 @@
+{% extends 'PraktikaTestBundle:Default:mybase.html.twig' %}
+{% block title %}Точки во втором формате{% endblock %}
+
+{% block body %}
+<div class="panel panel-primary">
+  <div class="panel-heading">
+    <h3 class="panel-title">точки с координатами базовая точка-азимут-расстояние</h3>
+  </div>
+  <div class="panel-body">
+   {% for mess in messages %}
+  {% if mess.status==1 %}
+  <span class="label label-danger">
+  {%else%}
+  <span class="label label-success">
+  {%endif%}
+  {{mess.text}}</span>
+  {% endfor %}
+	<div class="panel panel-default">
+		<div class="panel-heading">Добавление новой точки
+		</div>
+		<div class="panel-body">
+			<form action="{{ path('praktika_test_viewp2') }}" method="post">
+			{{ form_widget(form) }}
+			<input type="submit" value="Добавить" />
+			</form>
+		</div>
+	</div>
+	<div class="panel panel-default">
+	<div class="panel-heading">Список точек</div>
+	<div class="panel-body">
+
+	<table class="table table-striped table-hover ">
+	  <thead>
+		<tr>
+		  <th>#</th>
+		  <th>Наименование точки</th>
+		  <th>Широта</th>
+		  <th>Долгота</th>
+		  <th>Высота</th>
+		  <th>Азимут</th>
+		  <th>Расстояние</th>
+		  <th>Действие</th>
+		</tr>
+	  </thead>
+	  <tbody>
+		{% for point in points %}
+			<tr>
+			<td>{{loop.index}}</td>
+			<td>{{point.gettitle}}</td>
+			<td>{{point.getpoint.getbase.getlatitude}}</td>
+			<td>{{point.getpoint.getbase.getlongitude}}</td>
+			<td>{{point.getpoint.getbase.getheight}}</td>
+			<td>{{point.getpoint.getazimuth}}</td>
+			<td>{{point.getpoint.getdistance}}</td>
+			<td><div class="btn-group btn-group-justified">
+			  <a href="{{path('praktika_test_editpoint2')}}?id={{point.getid}}" class="btn btn-default btn-xs">Изменить</a>
+			  <a href="?del={{point.getid}}" class="btn btn-default btn-xs">Удалить</a>
+			</div></td>
+			</tr> 
+		{% endfor %}
+	  </tbody>
+	  </table> 
+	</div>
+	</div>
+<a href="{{ path('praktika_test_homepage') }}">На главную страничку тестового приложения</a>
+</div>
+{% endblock %}

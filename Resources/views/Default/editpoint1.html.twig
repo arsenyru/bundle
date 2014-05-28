@@ -1,0 +1,32 @@
+{% extends 'PraktikaTestBundle:Default:mybase.html.twig' %}
+{% block title %}Изменение данных точки{% endblock %}
+
+{% block body %}
+<div class="panel panel-primary">
+  <div class="panel-heading">
+    <h3 class="panel-title">изменение данных точки</h3>
+  </div>
+  <div class="panel-body">
+  
+  {% for mess in messages %}
+  {% if mess.status==1 %}
+  <span class="label label-danger">
+  {%else%}
+  <span class="label label-success">
+  {%endif%}
+  {{mess.text}}</span>
+  {% endfor %}
+<div class="panel panel-default">
+		<div class="panel-heading">Изменение данных
+	</div>
+    <div class="panel-body">
+    <form action="{{ path('praktika_test_editpoint1')}}?id={{id}}" method="post">  
+		{{ form_widget(form) }}
+		<input type="submit" value="Изменить" />
+	</form>
+	</div>
+</div>
+<a href="{{ path('praktika_test_homepage') }}">На главную страничку тестового приложения</a><br>
+<a href="{{ path('praktika_test_viewp1') }}">Назад к списку точек</a>
+</div>
+{% endblock %}

@@ -1,0 +1,12 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+        <title>{% block title %}Тестовое приложение{% endblock %}</title>
+		<link href="{{ asset('bundles/praktikatest/css/bootstrap.css') }}" rel="stylesheet" type="text/css" />
+		{%block myscript%}{%endblock%}
+    </head>
+    <body {%block onload%}{%endblock%}>
+        {% block body %}{% endblock %}
+    </body>
+</html>

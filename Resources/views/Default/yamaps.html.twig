@@ -1,0 +1,101 @@
+{% extends 'PraktikaTestBundle:Default:mybase.html.twig' %}
+{% block title %}Отображение точек на Яндекс.Картах{% endblock %}
+{% block onload %} onload="initialize()"{%endblock%}
+{%block myscript%}
+    <style>
+        body, html {
+            padding: 0;
+            margin: 0;
+            width: 100%;
+            height: 100%;
+        }
+        #map_canvas {
+            width: 100%;
+            height: 50%;
+        }
+    </style>
+<script src="http://api-maps.yandex.ru/2.1/?lang=ru_RU" type="text/javascript"></script>
+<script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.3/jquery.min.js"></script>
+<script type="text/javascript">
+var myMap;
+function initialize() {
+	ymaps.ready(init);
+}
+function init () {
+    // Создание экземпляра карты и его привязка к контейнеру с
+    // заданным id ("map").
+    myMap = new ymaps.Map('map_canvas', {
+        // При инициализации карты обязательно нужно указать
+        // её центр и коэффициент масштабирования.
+        center: [{{pts[0].getpoint.getlatitude}}, {{pts[0].getpoint.getlongitude}}], // Москва
+        zoom: 10
+    });
+	
+	{%for point in pts %}
+	// Создаем геообъект с типом геометрии "Точка".
+	myGeoObject = new ymaps.GeoObject({
+		// Описание геометрии.
+		geometry: {
+			type: "Point",
+			coordinates: [{{point.getpoint.getlatitude}}, {{point.getpoint.getlongitude}}]
+		},
+		// Свойства.
+		properties: {
+			// Контент метки.
+			iconContent: '{{point.gettitle}}'
+		}
+	}, {
+		// Иконка метки будет растягиваться под размер ее содержимого.
+		preset: 'islands#blackStretchyIcon',
+	});
+	myMap.geoObjects.add(myGeoObject);
+	{%endfor%}
+	{% if addClick %}
+	myMap.events.add('click', function(e){
+		var coords = e.get('coords');
+		ymaps.geocode(coords).then(function (res) {
+            var nameObject = res.geoObjects.get(0);
+			var nameToBD = nameObject.properties.get('text');
+			
+			$.ajax({ // AJAX to Add
+				type:'post',
+				url:'{{ path('praktika_test_yamaps') }}?addclick',
+				data: {'lat': coords[0].toPrecision(6), 'long': coords[1].toPrecision(6), 'title': nameToBD},
+				response: 'text',
+				success:function (data) {
+					$('#response').html(data);
+				}
+			});
+		});
+	});
+	{%endif%}
+}
+</script>
+{%endblock%}
+{% block body %}
+<div class="navbar navbar-inverse">
+  <div class="navbar-header">
+    <a class="navbar-brand" href="#">Отображение точек на карте</a>
+  </div>
+  <div class="navbar-collapse collapse navbar-inverse-collapse">
+    <ul class="nav navbar-nav">
+      <li><a href="{{ path('praktika_test_googlemaps') }}">Google Maps</a></li>
+      <li class="active"><a href="#">Яндекс.Карты</a></li>
+    </ul>
+	</div>
+</div>
+{% if (addClick) %}
+По клику на карте в базу данных первого формата будет добавлена точка<br>
+<span class="label label-success" id="response"></span>
+{% endif %}
+<div id="map_canvas"></div>
+<div class="panel panel-default">
+  <div class="panel-heading">Точки на карте</div>
+  <div class="panel-body">
+    {% for point in pts %}
+	<a href="#" onClick="myMap.setCenter([{{point.getpoint.getlatitude}}, {{point.getpoint.getlongitude}}])">{{point.gettitle}}</a>
+	{% endfor %}
+  </div>
+</div>
+<a href="{{ path('praktika_test_homepage') }}">На главную страничку тестового приложения</a><br>
+{% endblock %}

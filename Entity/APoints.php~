@@ -1,0 +1,25 @@
+<?php
+ namespace Praktika\TestBundle\Entity;
+ use Doctrine\ORM\Mapping as ORM;
+ use Knp\DoctrineBehaviors\Model as ORMBehaviors;
+ use Knp\DoctrineBehaviors\ORM\Geocodable\Type\APoint;
+ /**
+ * @ORM\Entity
+ * @ORM\Table(name="apoints")
+ */
+ class APoints {
+ /**
+ * @ORM\Id
+ * @ORM\Column(type="integer")
+ * @ORM\GeneratedValue(strategy="AUTO")
+ */
+ protected $id;
+ /**
+ * @ORM\Column(type="text")
+ */
+ protected $title;
+ /**
+ * @ORM\Column(type="apoint")
+ */
+ protected $point;
+}
